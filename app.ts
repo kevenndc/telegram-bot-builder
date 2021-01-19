@@ -6,17 +6,21 @@ import {
   UpdateType,
 } from "https://deno.land/x/telegram_bot_api/mod.ts";
 import messages from "./messages.ts";
+import Bot from './bot.ts';
+
 
 const TOKEN: string = <string> Deno.env.get("BOT_TOKEN");
-const bot = new TelegramBot(TOKEN);
+const bot = new Bot(TOKEN);
 
 
 bot.on(UpdateType.Message, async ({ message }) => {
+    const chatId: number = message.chat.id;
+
     if (isStart(message)) {
         const username = message.chat.first_name;
         const variables = new Map([['username', username]]);
         await bot.sendMessage({
-            chat_id: message.chat.id,
+            chat_id: chatId,
             text: buildText(messages.welcome, variables),
         });
         await bot.setMyCommands({
@@ -32,7 +36,11 @@ bot.on(UpdateType.Message, async ({ message }) => {
             ]
         });
     } else {
-        const expectedCommands =  await bot.getMyCommands();
+        bot.sendChatAction({
+            action: 'typing',
+            chat_id: chatId
+        });
+        console. log(bot.test());
     }
 });
 
@@ -68,3 +76,14 @@ function buildText(template: string, variables: Map<string, any>): string {
     }
     return output;
 }
+
+class BotCommandAction {
+    private action: any;
+    private bot: TelegramBot;
+
+    constructor(telegramBot: TelegramBot, action: any) {
+        this.bot = bot;
+        this.action = action;
+    }
+}
+
