@@ -1,8 +1,6 @@
 import "https://deno.land/x/dotenv/load.ts";
 import {
-  BotCommand,
   Message,
-  TelegramBot,
   UpdateType,
 } from "https://deno.land/x/telegram_bot_api/mod.ts";
 import messages from "./messages.ts";
@@ -16,14 +14,15 @@ bot.on(UpdateType.Message, async ({ message }) => {
   const username = message.chat.first_name;
   const variables = new Map([["username", username]]);
 
-  await bot.addCommands([
+  await bot.setCommands([
     {
-      command_name: "see_menu",
+      command: "see_menu",
       description: "Ver menu",
-      command_function: "sendMessage",
-      static_function_params: {
+      bot_action: "sendMessage",
+      static_params: {
         text: messages.see_menu,
       },
+      chat_action: 'typing'
     },
   ]);
 

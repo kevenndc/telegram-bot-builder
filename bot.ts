@@ -1,78 +1,77 @@
 import { TelegramBot } from "https://deno.land/x/telegram_bot_api/mod.ts";
 import { BotCommand } from "https://deno.land/x/telegram_bot_api@0.4.0/src/types/common/objects.ts";
-import BotActionCommand from "./bot-command.ts";
+import BotAction from "./bot-command.ts";
 
 export default class Bot extends TelegramBot {
-  private commands: Array<
-    {
-      command: BotCommand;
-      command_function: Function;
-      static_function_params: Object;
-    }
-  >;
+  private actions: Map<string, BotAction>; 
 
   constructor(token: string) {
     super(token);
-    this.commands = [];
+    this.actions = new Map();
   }
 
-  async addCommands(
+  /**
+   * This function (not to be confused with 'setMyCommands') is responsible for 
+   * creating and setting all bot commands as BotAction's
+   * 
+   * @param commands
+   */
+  async setCommands(
     commands: Array<{
-      command_name: string;
-      description: string;
-      command_function: string;
-      static_function_params: Object;
+      command: string,
+      description: string,
+      bot_action: string,
+      static_params: Object,
+      chat_action?: string
     }>,
   ) {
-    let newCommands: BotCommand[] = await this.getMyCommands();
-    commands.forEach((command) => {
+    let botCommands: BotCommand[] = await this.getMyCommands();
+
+    commands.forEach(cmd => {
       try {
-        const commandFunction = this[command.command_function as keyof Bot];
-        const newCommand = new BotActionCommand(
-          command.command_name,
-          command.description,
+        /**
+         * Uses the 'bot_action' string as key to get the correct action that the bot should
+         * execute when when the current command is executed.
+         */
+        const botAction = this[cmd.bot_action as keyof Bot];
+
+        const newAction= new BotAction(
+          cmd.command,
+          cmd.description,
+          botAction,
+          cmd.static_params,
+          cmd.chat_action
         );
-        this.commands.push({
-          command: newCommand,
-          command_function: commandFunction,
-          static_function_params: command.static_function_params,
-        });
-        newCommands.push(newCommand);
+
+        /**
+         * Stores the command name and description as keys for the same BotAction. This way a BotAction can be executed either if the user types the command name or the command description (common with the use of KeyboardMarkup's)
+         */
+        this.actions.set(cmd.command, newAction)
+                    .set(cmd.description, newAction);
+
+        botCommands.push(newAction);
+
       } catch (error) {
         throw new Error(`Error = ${error}`);
       }
     });
-    this.setMyCommands({ commands: newCommands });
+
+    await this.setMyCommands({ commands: botCommands });
   }
 
-  async execute(chatId: number, command: string) {
-    const commandObj = await this.getCommand(command);
-    console.log(commandObj);
-    if (commandObj) {
-      const params = Object.assign({ chat_id: chatId }, commandObj.params);
-      console.log(commandObj.function);
-      await commandObj.function(params);
+  async execute(chatId: number, text: string) {
+    const command = text.startsWith('/') ? text.substring(1) : text;
+    console.log(command);
+    const action = await this.actions.get(command);
+    //console.log(action);
+    if (action) {
+      const params = Object.assign({ chat_id: chatId }, action.static_params);
+      //if (action.chat_action !== "")
+      await action.execute(params);
     }
   }
 
-  getCommand(text: string): any {
-    let output: Object = {};
-    this.commands.forEach((cmd) => {
-      console.log(`${cmd.command.description} === ${text}`);
-
-      if (cmd.command.description === text) {
-        console.log("entrou");
-        output = Object.create({
-          function: cmd.command_function,
-          params: cmd.static_function_params,
-        });
-      }
-    });
-
-    return output;
-  }
-
   public get botCommands(): any {
-    return this.commands;
+    return this.actions;
   }
 }
